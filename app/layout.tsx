@@ -20,6 +20,9 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Split-It — Split expenses with friends",
   description: "Split bills and expenses effortlessly with friends and groups.",
+  icons: {
+    icon: "/favicon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
