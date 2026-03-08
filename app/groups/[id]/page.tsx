@@ -559,7 +559,7 @@ export default function GroupDetailPage() {
                 <p className="text-xs text-gray-500">{settleTarget.amount > 0 ? `${settleTarget.displayName} pays you` : `You pay ${settleTarget.displayName}`}</p>
                 <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-4 py-2">
                   <span className="text-lg font-semibold text-gray-400">{symbol}</span>
-                  <input type="number" min="0.01" step="0.01" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} className="flex-1 text-2xl font-bold text-gray-900 outline-none bg-transparent" selectOnFocus />
+                  <input type="number" min="0.01" step="0.01" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} className="flex-1 text-2xl font-bold text-gray-900 outline-none bg-transparent" onFocus={(e) => e.target.select()} />
                 </div>
                 <input value={settleNote} onChange={(e) => setSettleNote(e.target.value)} placeholder="Add a note (optional)" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#1B998B] bg-white" />
                 {settleError && <p className="text-sm text-[#E84545] font-medium">{settleError}</p>}
