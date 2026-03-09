@@ -13,7 +13,7 @@ export default function HomePage() {
     if (user) {
       router.replace('/groups');
     } else {
-      router.replace('/login');
+      router.replace('/landing');
     }
   }, [user, loading, router]);
 
