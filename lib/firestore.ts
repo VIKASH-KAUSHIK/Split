@@ -2,6 +2,7 @@ import {
   addDoc,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -165,6 +166,26 @@ export async function updateGroupWhiteboard(
   content: string
 ): Promise<void> {
   await updateDoc(doc(db, 'groups', groupId), { whiteboard: content });
+}
+
+export async function updateExpense(
+  groupId: string,
+  expenseId: string,
+  description: string,
+  amount: number,
+  paidBy: string,
+  splits: Record<string, number>
+): Promise<void> {
+  await updateDoc(doc(db, 'groups', groupId, 'expenses', expenseId), {
+    description,
+    amount,
+    paidBy,
+    splits,
+  });
+}
+
+export async function deleteExpense(groupId: string, expenseId: string): Promise<void> {
+  await deleteDoc(doc(db, 'groups', groupId, 'expenses', expenseId));
 }
 
 export async function addExpense(

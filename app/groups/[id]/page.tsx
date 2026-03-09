@@ -9,6 +9,8 @@ import {
   getGroup,
   subscribeToGroupExpenses,
   addExpense,
+  updateExpense,
+  deleteExpense,
   createInvite,
   subscribeToGroupSettlements,
   addSettlement,
@@ -31,7 +33,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 type SplitMode = 'equally' | 'exact' | 'percentage' | 'shares' | 'adjustment';
-type ModalType = 'addExpense' | 'invite' | 'settle' | 'charts' | 'balances' | 'totals' | 'whiteboard' | null;
+type ModalType = 'addExpense' | 'invite' | 'settle' | 'charts' | 'balances' | 'totals' | 'whiteboard' | 'expenseDetail' | null;
 
 const MODE_TABS: { mode: SplitMode; icon: string; label: string }[] = [
   { mode: 'equally', icon: '=', label: 'Equally' },
@@ -99,6 +101,12 @@ export default function GroupDetailPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Expense detail / edit state
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [expDetailEditMode, setExpDetailEditMode] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.replace('/login'); return; }
@@ -145,6 +153,42 @@ export default function GroupDetailPage() {
     if (m === 'addExpense' && group) initSplitState(group);
     if (m === 'invite') { setInviteUrl(''); setCopied(false); handleInviteLoad(); }
     setModal(m);
+  }
+
+  function openExpenseDetail(exp: Expense) {
+    setSelectedExpense(exp);
+    setExpDetailEditMode(false);
+    setModal('expenseDetail');
+  }
+
+  function openExpenseEdit(exp: Expense) {
+    if (!group) return;
+    setExpDesc(exp.description);
+    setExpAmount(exp.amount.toFixed(2));
+    setPaidBy(exp.paidBy);
+    setSplitMode('exact');
+    setShowAdvanced(true);
+    const initExact: Record<string, string> = {};
+    const initPct: Record<string, string> = {};
+    const initShares: Record<string, string> = {};
+    const initAdj: Record<string, string> = {};
+    const payerShare = exp.amount - Object.values(exp.splits).reduce((s, v) => s + v, 0);
+    group.members.forEach((uid) => {
+      if (uid === exp.paidBy) {
+        initExact[uid] = payerShare > 0 ? payerShare.toFixed(2) : '0';
+      } else {
+        initExact[uid] = (exp.splits[uid] ?? 0) > 0 ? exp.splits[uid].toFixed(2) : '';
+      }
+      initPct[uid] = '';
+      initShares[uid] = '1';
+      initAdj[uid] = '0';
+    });
+    setExactValues(initExact);
+    setPercentValues(initPct);
+    setShareValues(initShares);
+    setAdjustValues(initAdj);
+    setExpError('');
+    setExpDetailEditMode(true);
   }
 
   async function handleInviteLoad() {
@@ -215,10 +259,19 @@ export default function GroupDetailPage() {
     if (numAmount <= 0) { setExpError('Enter a valid amount.'); return; }
     const splits = computeSplits();
     if (splits === null) { setExpError('Complete the split options before saving.'); return; }
-    setAddingExpense(true); setExpError('');
-    try { await addExpense(group.id, expDesc.trim(), numAmount, paidBy, splits, user.uid); setModal(null); }
-    catch (err) { setExpError(err instanceof Error ? err.message : 'Failed to add expense.'); }
-    finally { setAddingExpense(false); }
+    if (expDetailEditMode && selectedExpense) {
+      setEditingExpense(true); setExpError('');
+      try {
+        await updateExpense(group.id, selectedExpense.id, expDesc.trim(), numAmount, paidBy, splits);
+        setModal(null); setSelectedExpense(null); setExpDetailEditMode(false);
+      } catch (err) { setExpError(err instanceof Error ? err.message : 'Failed to update expense.'); }
+      finally { setEditingExpense(false); }
+    } else {
+      setAddingExpense(true); setExpError('');
+      try { await addExpense(group.id, expDesc.trim(), numAmount, paidBy, splits, user.uid); setModal(null); }
+      catch (err) { setExpError(err instanceof Error ? err.message : 'Failed to add expense.'); }
+      finally { setAddingExpense(false); }
+    }
   }
 
   async function handleSettle(e: React.FormEvent) {
@@ -389,7 +442,11 @@ export default function GroupDetailPage() {
                 const myShare = exp.splits[user?.uid ?? ''] ?? 0;
                 const total = Object.values(exp.splits).reduce((s, v) => s + v, 0);
                 return (
-                  <div key={exp.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-start gap-3">
+                  <button
+                    key={exp.id}
+                    onClick={() => openExpenseDetail(exp)}
+                    className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-start gap-3 hover:border-[#1B998B]/40 hover:shadow-md transition-all duration-150 active:scale-[0.99]"
+                  >
                     <div className="w-10 h-10 rounded-xl bg-[#E8F8F6] flex items-center justify-center text-lg shrink-0">🧾</div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{exp.description}</p>
@@ -401,7 +458,8 @@ export default function GroupDetailPage() {
                         : myShare > 0 ? <p className="text-xs text-[#E84545] font-medium mt-0.5">you owe {symbol}{myShare.toFixed(2)}</p>
                         : <p className="text-xs text-gray-400 mt-0.5">not involved</p>}
                     </div>
-                  </div>
+                    <svg className="w-4 h-4 text-gray-300 mt-1 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
                 );
               })}
             </div>
@@ -415,9 +473,9 @@ export default function GroupDetailPage() {
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
           <form onSubmit={handleAddExpense} className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <button type="button" onClick={() => setModal(null)} className="text-sm text-[#E84545] font-semibold">Cancel</button>
-              <h2 className="text-base font-bold text-gray-900">Add Expense</h2>
-              <button type="submit" disabled={addingExpense} className="text-sm font-bold text-[#1B998B] disabled:opacity-40">{addingExpense ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={() => { setModal(null); setExpDetailEditMode(false); }} className="text-sm text-[#E84545] font-semibold">Cancel</button>
+              <h2 className="text-base font-bold text-gray-900">{expDetailEditMode ? 'Edit Expense' : 'Add Expense'}</h2>
+              <button type="submit" disabled={addingExpense || editingExpense} className="text-sm font-bold text-[#1B998B] disabled:opacity-40">{addingExpense || editingExpense ? 'Saving…' : 'Save'}</button>
             </div>
             <div className="overflow-y-auto flex-1">
               <div className="px-5 pt-4 pb-2 space-y-3">
@@ -757,6 +815,109 @@ export default function GroupDetailPage() {
             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center gap-2">
               <span className="text-xs text-gray-400">🔄</span>
               <p className="text-xs text-gray-400">Changes are visible to all group members instantly</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════ */}
+      {/* EXPENSE DETAIL MODAL */}
+      {modal === 'expenseDetail' && selectedExpense && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <button onClick={() => { setModal(null); setSelectedExpense(null); }} className="text-sm text-gray-400 font-semibold">✕</button>
+              <h2 className="text-base font-bold text-gray-900">Expense Details</h2>
+              <div className="w-8" />
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+              {/* Hero */}
+              <div className="bg-[#E8F8F6] rounded-2xl p-6 text-center border border-[#1B998B]/20 flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm border border-[#1B998B]/20 mb-1">🧾</div>
+                <p className="text-xl font-bold text-gray-900">{selectedExpense.description}</p>
+                <p className="text-4xl font-bold text-[#1B998B]">{formatAmount(selectedExpense.amount, group.currency)}</p>
+                <p className="text-sm text-gray-400">
+                  {selectedExpense.date?.toDate?.().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) ?? ''}
+                </p>
+              </div>
+
+              {/* Paid by */}
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Paid by</p>
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <div className="w-9 h-9 rounded-full bg-[#1B998B]/20 flex items-center justify-center text-sm font-bold text-[#1B998B] shrink-0">
+                    {(selectedExpense.paidBy === user?.uid ? 'You' : (group.memberDetails[selectedExpense.paidBy]?.displayName ?? 'U'))[0].toUpperCase()}
+                  </div>
+                  <p className="flex-1 font-semibold text-gray-900">
+                    {selectedExpense.paidBy === user?.uid ? 'You' : (group.memberDetails[selectedExpense.paidBy]?.displayName ?? selectedExpense.paidBy)}
+                  </p>
+                  <p className="font-bold text-[#1B998B]">{formatAmount(selectedExpense.amount, group.currency)}</p>
+                </div>
+              </div>
+
+              {/* Split breakdown */}
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Split</p>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  {/* Payer's own share */}
+                  {(() => {
+                    const splitTotal = Object.values(selectedExpense.splits).reduce((s, v) => s + v, 0);
+                    const payerShare = selectedExpense.amount - splitTotal;
+                    const payerName = selectedExpense.paidBy === user?.uid ? 'You' : (group.memberDetails[selectedExpense.paidBy]?.displayName ?? selectedExpense.paidBy);
+                    return (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-100">
+                        <div className="w-8 h-8 rounded-full bg-[#1B998B]/20 flex items-center justify-center text-xs font-bold text-[#1B998B] shrink-0">{payerName[0].toUpperCase()}</div>
+                        <p className="flex-1 text-sm font-medium text-gray-800">{payerName}</p>
+                        {payerShare > 0.001
+                          ? <p className="text-sm font-semibold text-gray-700">{formatAmount(payerShare, group.currency)}</p>
+                          : <p className="text-sm text-gray-400">paid in full</p>}
+                      </div>
+                    );
+                  })()}
+                  {Object.entries(selectedExpense.splits).map(([uid, amt], i, arr) => {
+                    const name = uid === user?.uid ? 'You' : (group.memberDetails[uid]?.displayName ?? uid);
+                    return (
+                      <div key={uid} className={`flex items-center gap-3 p-3 bg-white ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                        <div className="w-8 h-8 rounded-full bg-[#E84545]/10 flex items-center justify-center text-xs font-bold text-[#E84545] shrink-0">{name[0].toUpperCase()}</div>
+                        <p className="flex-1 text-sm font-medium text-gray-800">{name}</p>
+                        <p className="text-sm font-semibold text-[#E84545]">{formatAmount(amt, group.currency)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  openExpenseEdit(selectedExpense);
+                  setModal('addExpense');
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#1B998B] bg-[#E8F8F6] text-[#1B998B] font-bold text-sm hover:bg-[#d4f2ee] transition"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Edit
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm(`Delete "${selectedExpense.description}"? This cannot be undone.`)) return;
+                  setDeletingExpense(true);
+                  try {
+                    await deleteExpense(group.id, selectedExpense.id);
+                    setModal(null); setSelectedExpense(null);
+                  } catch { /* silent */ }
+                  finally { setDeletingExpense(false); }
+                }}
+                disabled={deletingExpense}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#E84545] bg-red-50 text-[#E84545] font-bold text-sm hover:bg-red-100 transition disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}><polyline points="3 6 5 6 21 6" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {deletingExpense ? 'Deleting…' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
