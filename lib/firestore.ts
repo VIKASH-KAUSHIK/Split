@@ -174,13 +174,16 @@ export async function updateExpense(
   description: string,
   amount: number,
   paidBy: string,
-  splits: Record<string, number>
+  splits: Record<string, number>,
+  aiCategory?: string,
+  aiCategoryEmoji?: string
 ): Promise<void> {
   await updateDoc(doc(db, 'groups', groupId, 'expenses', expenseId), {
     description,
     amount,
     paidBy,
     splits,
+    ...(aiCategory ? { aiCategory, aiCategoryEmoji } : {}),
   });
 }
 
@@ -194,7 +197,9 @@ export async function addExpense(
   amount: number,
   paidBy: string,
   splits: Record<string, number>,
-  createdBy: string
+  createdBy: string,
+  aiCategory?: string,
+  aiCategoryEmoji?: string
 ): Promise<void> {
   await addDoc(collection(db, 'groups', groupId, 'expenses'), {
     description,
@@ -204,5 +209,7 @@ export async function addExpense(
     date: serverTimestamp(),
     createdBy,
     createdAt: serverTimestamp(),
+    // Store AI category so it persists and shows on every page
+    ...(aiCategory ? { aiCategory, aiCategoryEmoji } : {}),
   });
 }

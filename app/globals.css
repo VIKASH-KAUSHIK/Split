@@ -16,3 +16,77 @@
 body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
+
+/* ── AI Category badge animations ── */
+
+@keyframes ai-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ai-thinking-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes ai-dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+}
+
+@keyframes ai-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes ai-scan-line {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+
+.ai-fade-in {
+  animation: ai-fade-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.ai-thinking span {
+  display: inline-block;
+  animation: ai-dot-bounce 1.2s ease-in-out infinite;
+}
+.ai-thinking span:nth-child(2) { animation-delay: 0.15s; }
+.ai-thinking span:nth-child(3) { animation-delay: 0.3s; }
+
+.ai-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #1B998B 0%,
+    #6ee7b7 40%,
+    #1B998B 60%,
+    #6ee7b7 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: ai-shimmer 2s linear infinite;
+}
+
+/* Category badge in expense cards */
+.ai-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0.9;
+}

@@ -47,6 +47,9 @@ export interface Expense {
   date: Timestamp;
   createdBy: string;
   createdAt: Timestamp;
+  // AI-detected category (stored so it shows consistently)
+  aiCategory?: string;
+  aiCategoryEmoji?: string;
 }
 
 export interface Invite {
@@ -75,6 +78,17 @@ export const GROUP_CATEGORY_LABELS: Record<GroupCategory, string> = {
   home: 'Home',
   couple: 'Couple',
   other: 'Other',
+};
+
+// Emoji for expense category display
+export const EXPENSE_CATEGORY_EMOJIS: Record<string, string> = {
+  'Food & Dining': '🍕',
+  'Travel': '🚗',
+  'Entertainment': '🎬',
+  'Shopping': '🛒',
+  'Utilities': '🏠',
+  'Health & Fitness': '💊',
+  'Education': '📚',
 };
 
 export interface Balance {

@@ -7,6 +7,8 @@ import { useAuth } from '@/context/auth-context';
 import { Navbar } from '@/components/navbar';
 import { subscribeToUserGroups, subscribeToGroupExpenses } from '@/lib/firestore';
 import { formatAmount, type Group, type Expense } from '@/lib/types';
+import { categorizeExpense } from '@/lib/ai-categorizer';
+import { AiCategoryChip } from '@/components/ai-category-chip';
 
 interface ActivityItem extends Expense {
   groupId: string;
@@ -147,11 +149,24 @@ export default function ActivityPage() {
                 year: 'numeric',
               }) ?? '';
 
+              // Resolve category: prefer stored value, else derive from description
+              const storedCategory = item.aiCategory
+                ? { label: item.aiCategory, emoji: item.aiCategoryEmoji ?? '📦', color: '#1B998B', confidence: 95 }
+                : categorizeExpense(item.description);
+
+              // Icon: use category emoji if detected, else 🧾
+              const cardIcon = storedCategory ? storedCategory.emoji : '🧾';
+
               return (
-                <div key={`${item.groupId}-${item.id}`} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
+                <div
+                  key={`${item.groupId}-${item.id}`}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3"
+                >
+                  {/* Category / receipt icon */}
                   <div className="w-10 h-10 rounded-xl bg-[#E8F8F6] flex items-center justify-center text-lg shrink-0">
-                    🧾
+                    {cardIcon}
                   </div>
+
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900 leading-snug">
                       <span className="font-bold">{paidByName}</span>
@@ -165,9 +180,24 @@ export default function ActivityPage() {
                         {item.groupName}
                       </Link>
                     </p>
+
+                    {/* AI Category badge */}
+                    {storedCategory && (
+                      <div className="mt-1">
+                        <AiCategoryChip
+                          label={storedCategory.label}
+                          emoji={storedCategory.emoji}
+                          color={storedCategory.color}
+                          showPrefix
+                          size="sm"
+                        />
+                      </div>
+                    )}
+
                     <p className={`text-xs font-semibold mt-1 ${statusColor}`}>{statusText}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
                   </div>
+
                   <div className="shrink-0 text-right">
                     <p className="font-bold text-gray-900">{formatAmount(totalPaid, item.groupCurrency)}</p>
                   </div>
